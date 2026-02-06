@@ -508,6 +508,39 @@ const DashboardHeader = ({
 
 ---
 
+## 修改 7：国际化翻译添加
+
+### 功能描述
+为用户组限制功能添加中英文翻译支持。
+
+### 修改文件
+
+#### 1. `web/src/i18n/locales/zh.json`
+添加以下中文翻译：
+
+```json
+"无限制": "无限制",
+"同时进行的请求数限制": "同时进行的请求数限制",
+"每分钟请求数限制": "每分钟请求数限制",
+"每分钟令牌数限制": "每分钟令牌数限制",
+"每日令牌数限制": "每日令牌数限制",
+"并发数": "并发数"
+```
+
+#### 2. `web/src/i18n/locales/en.json`
+添加以下英文翻译：
+
+```json
+"无限制": "Unlimited",
+"同时进行的请求数限制": "Concurrent request limit",
+"每分钟请求数限制": "Requests per minute limit",
+"每分钟令牌数限制": "Tokens per minute limit",
+"每日令牌数限制": "Tokens per day limit",
+"并发数": "Concurrency"
+```
+
+---
+
 ## 修改文件清单
 
 | 文件路径 | 修改类型 | 说明 |
@@ -681,3 +714,125 @@ func registerMjRouterGroup(relayMjRouter *gin.RouterGroup) {
 	// ...
 }
 ```
+
+---
+
+## 升级策略建议
+
+### 方法一：使用 Git Stash（推荐用于小型修改）
+
+```bash
+# 1. 暂存当前修改
+git stash push -m "自定义修改备份"
+
+# 2. 拉取官方最新代码
+git pull origin main
+
+# 3. 恢复暂存的修改
+git stash pop
+
+# 4. 解决可能的冲突
+# 如果有冲突，手动编辑冲突文件，然后：
+git add .
+git commit -m "合并官方更新与自定义修改"
+```
+
+### 方法二：使用独立分支（推荐用于大型修改）
+
+```bash
+# 1. 创建并切换到自定义分支（如果还没有）
+git checkout -b custom-features
+
+# 2. 确保所有自定义修改已提交
+git add .
+git commit -m "自定义功能：用户组限制等"
+
+# 3. 切换到主分支并拉取最新代码
+git checkout main
+git pull origin main
+
+# 4. 切换回自定义分支并合并主分支
+git checkout custom-features
+git merge main
+
+# 5. 解决冲突（如果有）
+# 编辑冲突文件后：
+git add .
+git commit -m "合并官方更新"
+```
+
+### 方法三：手动备份与恢复
+
+```bash
+# 1. 备份修改的文件
+cp -r setting/group_limit.go ~/backup/
+cp -r common/group_limiter.go ~/backup/
+cp -r middleware/group-limit.go ~/backup/
+# ... 备份其他修改的文件
+
+# 2. 拉取官方最新代码
+git fetch origin
+git reset --hard origin/main
+
+# 3. 手动恢复新建的文件
+cp ~/backup/group_limit.go setting/
+cp ~/backup/group_limiter.go common/
+cp ~/backup/group-limit.go middleware/
+
+# 4. 参照本文档手动修改其他文件
+```
+
+### 升级后验证步骤
+
+1. **后端编译验证**：
+   ```bash
+   go build .
+   ```
+
+2. **前端编译验证**：
+   ```bash
+   cd web && npm run build
+   ```
+
+3. **功能测试**：
+   - 测试用户组限制功能（并发数、RPM、RPD、TPM、TPD）
+   - 测试数据看板限制信息显示
+   - 测试分组描述设置和显示
+   - 测试令牌创建时的分组选择
+
+### 冲突处理指南
+
+当遇到合并冲突时，优先保留以下内容：
+
+1. **新建文件**：直接保留，不会有冲突
+   - `setting/group_limit.go`
+   - `common/group_limiter.go`
+   - `middleware/group-limit.go`
+
+2. **修改的文件**：需要仔细合并
+   - 如果官方修改了相同函数，需要将自定义代码整合到新版本中
+   - 参照本文档中的代码片段进行合并
+
+3. **前端文件**：
+   - 如果官方更新了组件结构，可能需要调整自定义代码的位置
+   - 注意检查 import 语句是否需要更新
+
+### 建议的 Git 工作流
+
+```
+main (官方代码)
+  │
+  ├── git pull origin main (同步官方更新)
+  │
+  └── custom-features (自定义分支)
+        │
+        ├── 所有自定义修改在此分支
+        │
+        └── 定期从 main 合并更新
+```
+
+这种工作流的优点：
+- 自定义修改与官方代码分离
+- 便于追踪自定义修改的历史
+- 合并冲突时更容易识别和解决
+- 可以随时切换到纯官方版本进行对比测试

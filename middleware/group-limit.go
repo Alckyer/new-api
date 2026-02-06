@@ -33,17 +33,6 @@ func GroupLimit() gin.HandlerFunc {
 		// 标记 c.Next() 是否已被调用，防止 panic recovery 中重复调用
 		nextCalled := false
 
-		// 安全地执行限流检查，任何错误都不影响原有功能
-		defer func() {
-			if r := recover(); r != nil {
-				common.SysLog("GroupLimit panic recovered: " + toString(r))
-				// 只有在 c.Next() 尚未被调用时才调用，避免重复执行处理器
-				if !nextCalled {
-					c.Next()
-				}
-			}
-		}()
-
 		// 获取用户ID
 		userID := c.GetInt("id")
 		if userID == 0 {
@@ -77,6 +66,25 @@ func GroupLimit() gin.HandlerFunc {
 			UserID:            userID,
 			ConcurrencyLocked: false,
 		}
+
+		// 安全地执行限流检查，任何错误都不影响原有功能
+		// 使用 defer 确保并发锁一定会被释放，即使发生 panic
+		defer func() {
+			// 无论如何都要释放并发锁（如果已获取）
+			if ctx.ConcurrencyLocked {
+				if err := limiter.ReleaseConcurrency(userID); err != nil {
+					common.SysLog("GroupLimit ReleaseConcurrency error: " + err.Error())
+				}
+			}
+
+			if r := recover(); r != nil {
+				common.SysLog("GroupLimit panic recovered: " + toString(r))
+				// 只有在 c.Next() 尚未被调用时才调用，避免重复执行处理器
+				if !nextCalled {
+					c.Next()
+				}
+			}
+		}()
 
 		// 检查 RPM 限制
 		if config.RPM > 0 {
@@ -124,12 +132,7 @@ func GroupLimit() gin.HandlerFunc {
 		nextCalled = true
 		c.Next()
 
-		// 释放并发锁
-		if ctx.ConcurrencyLocked {
-			if err := limiter.ReleaseConcurrency(userID); err != nil {
-				common.SysLog("GroupLimit ReleaseConcurrency error: " + err.Error())
-			}
-		}
+		// 注意：并发锁的释放已移至 defer 中，确保一定会执行
 	}
 }
 
